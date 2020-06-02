@@ -9,7 +9,13 @@
 #include <linux/if_packet.h>
 
 #define BUFFER_SIZE 1600
-#define ETHERTYPE 0x0FFF
+#define ETHERTYPE 0x0806
+
+// Defines para pegar as informaçoes desejadas no pacote ARP
+#define LEN_TO_IP_ADDR 14
+#define LEN_IP_ADDR 4
+#define LEN_TO_OPERATION 6
+#define LEN_OPERATION 2
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +24,9 @@ int main(int argc, char *argv[])
 	unsigned char *data;
 	struct ifreq ifr;
 	char ifname[IFNAMSIZ];
+
+	unsigned char ip[LEN_IP_ADDR];
+	unsigned char op[LEN_OPERATION];
 
 	if (argc != 2) {
 		printf("Usage: %s iface\n", argv[0]);
@@ -72,14 +81,17 @@ int main(int argc, char *argv[])
 		ethertype = ntohs(ethertype);
 		data = (buffer+sizeof(mac_dst)+sizeof(mac_src)+sizeof(ethertype));
 
-		if (ethertype == ETHERTYPE) {
-			printf("MAC destino: %02x:%02x:%02x:%02x:%02x:%02x\n", 
-                        mac_dst[0], mac_dst[1], mac_dst[2], mac_dst[3], mac_dst[4], mac_dst[5]);
+		/* Pega a operação do pacote ARP (01 request, 02 reply) */
+		memcpy(op, &data[LEN_TO_OPERATION], LEN_OPERATION);
+
+		/* Pega o endereço ip de origem do pacote */
+		memcpy(ip, &data[LEN_TO_IP_ADDR], LEN_IP_ADDR);
+
+		/* se tiver o ethertype do pacote ARP e for um reply, printa os endereços MAC e IP */
+		if (ethertype == ETHERTYPE && op[1] == 2) {
+			printf("IP origem: %u:%u:%u:%u  :  ", ip[0], ip[1], ip[2], ip[3]);
 			printf("MAC origem:  %02x:%02x:%02x:%02x:%02x:%02x\n", 
                         mac_src[0], mac_src[1], mac_src[2], mac_src[3], mac_src[4], mac_src[5]);
-			printf("EtherType: 0x%04x\n", ethertype);
-			printf("Dado: %s\n", data);
-			printf("\n");
 		}
 	}
 

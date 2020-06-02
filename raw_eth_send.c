@@ -26,9 +26,11 @@ int main(int argc, char *argv[])
 	char dest_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; //broadcast
 	short int ethertype = htons(0x0806);
 
+	int loop_len = 0;
+	int loop_len2 = 0;
 	unsigned char buffer_arp[6];
-	unsigned char ip_orig[] = {192, 168, 56, 1};
-	unsigned char ip_dest[] = {192, 168, 56, 1};
+	unsigned char ip_orig[] = {192, 168, 25, 16};
+	unsigned char ip_dest[] = {192, 168, 25, 16};
 
 	if (argc != 2) {
 		printf("Usage: %s iface\n", argv[0]);
@@ -85,16 +87,7 @@ int main(int argc, char *argv[])
 	memcpy(buffer + frame_len, &ethertype, sizeof(ethertype));
 	frame_len += sizeof(ethertype);
 
-	/**************************************/
-	/*
-	// Obtem uma mensagem do usuario
-	printf("Digite a mensagem: ");
-	scanf("%[^\n]s", data);
-
-	// Preenche o campo de dados
-	memcpy(buffer + frame_len, data, strlen(data));
-	frame_len += strlen(data) + 1;
-	*/
+	/**********************************************/
 
 	/* Colocando interface de HW Ethernet */
 	memset(buffer_arp, 0, sizeof(buffer_arp));
@@ -138,31 +131,35 @@ int main(int argc, char *argv[])
 	memcpy(data + arp_header_len, dest_mac, 6);
 	arp_header_len += 6;
 
-	/* Endereço IP do nó destino */
-	memcpy(data + arp_header_len, ip_dest, 4);
-	arp_header_len += 4;
+	loop_len = arp_header_len;
+	loop_len2 = frame_len;
 
-	/* Preenche o campo de dados */
-	memcpy(buffer + frame_len, data, arp_header_len);
-	frame_len += arp_header_len;
-
-	printf("Header Length : %d\n", arp_header_len);
-
-	for(int i = 0; i < arp_header_len; i++)
+	/* envia para todos os IP da rede local 192.168.25.x */
+	for(ip_dest[3] = 0; ip_dest[3] < 255; ip_dest[3]++)
 	{
-		printf("%u\n",data[i]);
+		arp_header_len = loop_len;
+		frame_len = loop_len2;
+
+		/* Endereço IP do nó destino */
+		memcpy(data + arp_header_len, ip_dest, 4);
+		arp_header_len += 4;
+
+		/* Preenche o campo de dados */
+		memcpy(buffer + frame_len, data, arp_header_len);
+		frame_len += arp_header_len;
+
+	/******************************************************/
+
+		/* Envia pacote */
+		if (sendto(fd, buffer, frame_len, 0, (struct sockaddr *) &socket_address, sizeof (struct sockaddr_ll)) < 0) {
+			perror("send");
+			close(fd);
+			exit(1);
+		}
+
 	}
-
-	/***************************************/
-
-	/* Envia pacote */
-	if (sendto(fd, buffer, frame_len, 0, (struct sockaddr *) &socket_address, sizeof (struct sockaddr_ll)) < 0) {
-		perror("send");
-		close(fd);
-		exit(1);
-	}
-
-	printf("Pacote enviado.\n");
+	
+	printf("Pacotes enviados.\n");
 
 	close(fd);
 	return 0;
